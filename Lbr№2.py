@@ -1,11 +1,7 @@
 import numpy as np
 import time
 from numba import jit
-
-
-# ------------------------------------------------------------
 # Генерация матриц, варианты 1 и 2 остаются без изменений
-# ------------------------------------------------------------
 def generate_matrices(n):
     A = (np.random.randn(n, n).astype(np.float32) +
          1j * np.random.randn(n, n).astype(np.float32))
@@ -29,10 +25,7 @@ def naive_matmul(A, B):
 def blas_matmul(A, B):
     return A @ B
 
-
-# ------------------------------------------------------------
 # Вариант 3: оптимизированный блочный алгоритм (без Numba)
-# ------------------------------------------------------------
 def block_matmul_optimized(A, B, block_size=256):
     n = A.shape[0]
     C = np.zeros((n, n), dtype=np.complex64)
@@ -46,9 +39,8 @@ def block_matmul_optimized(A, B, block_size=256):
     return C
 
 
-# ------------------------------------------------------------
 # Измерение производительности
-# ------------------------------------------------------------
+
 def measure_performance(matmul_func, A, B, name, n, ref_mflops=None):
     c = 2 * n ** 3
     # Прогрев (для JIT-функций)
@@ -114,3 +106,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+print("Мироненко Егор Сергеевич")
+print("гр: 090301-ПОВа-о25")
