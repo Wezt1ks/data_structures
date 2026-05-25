@@ -1,15 +1,14 @@
 import numpy as np
 import time
 from numba import jit
-# Генерация матриц, варианты 1 и 2 остаются без изменений
+# 1. Генерация случайных комплексных матриц
 def generate_matrices(n):
     A = (np.random.randn(n, n).astype(np.float32) +
          1j * np.random.randn(n, n).astype(np.float32))
     B = (np.random.randn(n, n).astype(np.float32) +
          1j * np.random.randn(n, n).astype(np.float32))
     return A, B
-
-
+# 2. Наивный алгоритм (вариант 1) с Numba
 @jit(nopython=True)
 def naive_matmul(A, B):
     n = A.shape[0]
@@ -20,13 +19,12 @@ def naive_matmul(A, B):
             for j in range(n):
                 C[i, j] += aik * B[k, j]
     return C
-
-
+# 3. Эталонный BLAS (вариант 2)
 def blas_matmul(A, B):
     return A @ B
 
-# Вариант 3: оптимизированный блочный алгоритм (без Numba)
-def block_matmul_optimized(A, B, block_size=256):
+# 4. Блочный алгоритм с вызовом BLAS для подблоков (вариант 3)
+def block_matmul_blas(A, B, block_size=512):
     n = A.shape[0]
     C = np.zeros((n, n), dtype=np.complex64)
     for i in range(0, n, block_size):
@@ -35,15 +33,12 @@ def block_matmul_optimized(A, B, block_size=256):
             k_end = min(k + block_size, n)
             for j in range(0, n, block_size):
                 j_end = min(j + block_size, n)
-                C[i:i_end, j:j_end] += (A[i:i_end, k:k_end] @ B[k:k_end, j:j_end])
+                C[i:i_end, j:j_end] += A[i:i_end, k:k_end] @ B[k:k_end, j:j_end]
     return C
-
-
-# Измерение производительности
-
+# 5. Измерение производительности
 def measure_performance(matmul_func, A, B, name, n, ref_mflops=None):
     c = 2 * n ** 3
-    # Прогрев (для JIT-функций)
+    # Прогрев
     _ = matmul_func(A, B)
     time.sleep(0.1)
     start = time.perf_counter()
@@ -57,8 +52,7 @@ def measure_performance(matmul_func, A, B, name, n, ref_mflops=None):
     else:
         print(f"{name:35} | Время: {elapsed:.3f} с | MFLOPS: {mflops:.2f}")
     return elapsed, mflops
-
-
+# 6. Основная функция
 def main():
     n = 1024
     print("=" * 70)
@@ -67,44 +61,48 @@ def main():
     print("Генерация случайных матриц...")
     A, B = generate_matrices(n)
     print("Готово.\n")
-
-    # Эталонный BLAS
+    #Вариант 2: эталонный BLAS
     print("Измерение варианта 2 (BLAS / cblas_cgemm)...")
-    _, ref_mflops = measure_performance(blas_matmul, A, B, "2. BLAS (cgemm)", n, ref_mflops=None)
+    _, ref_mflops = measure_performance(blas_matmul, A, B, "2. BLAS (cgemm)", n)
     print()
 
-    # Вариант 1
+    #Вариант 1: наивный
     print("Измерение варианта 1 (наивный алгоритм, Numba)...")
-    measure_performance(naive_matmul, A, B, "1. Наивный (i-k-j)", n, ref_mflops=ref_mflops)
+    measure_performance(naive_matmul, A, B, "1. Наивный (i-k-j)", n, ref_mflops)
     print()
 
-    # Вариант 3 – подбираем оптимальный размер блока
-    print("Измерение варианта 3 (блочный алгоритм с вызовом BLAS внутри блоков)...")
+    #Вариант 3: блочный с BLAS внутри блоков
+    print("Измерение варианта 3 (блочный алгоритм с вызовом BLAS для подблоков)...")
     best_mflops = 0
     best_bs = None
+    best_rel = 0
     for bs in [128, 256, 512]:
-        def wrapper(A, B):
-            return block_matmul_optimized(A, B, block_size=bs)
-
-        t, m = measure_performance(wrapper, A, B, f"3. Блочный (bs={bs})", n, ref_mflops=ref_mflops)
+        t, m = measure_performance(
+            lambda A, B, bs=bs: block_matmul_blas(A, B, block_size=bs),
+            A, B, f"3. Блочный (bs={bs})", n, ref_mflops
+        )
+        rel = m / ref_mflops * 100
         if m > best_mflops:
             best_mflops = m
             best_bs = bs
-        if m / ref_mflops >= 0.3:
-            print(f"  -> Достигнуто >=30% от BLAS с block_size={bs}\n")
+            best_rel = rel
+        if rel >= 30:
+            print(f"  -> Достигнуто ≥30% от BLAS с block_size={bs}\n")
             break
     else:
-        print(
-            f"  Лучший результат: {best_mflops:.2f} MFLOPS ({best_mflops / ref_mflops * 100:.1f}%) с bs={best_bs} – требование выполнено.\n")
+        print(f"  Лучший результат: {best_mflops:.2f} MFLOPS ({best_rel:.1f}%) с bs={best_bs}")
 
-    print("=" * 70)
+    #Итоговый вывод
+    print("\n" + "=" * 70)
     print(f"Анализ: сложность c = 2·{n}³ = {2 * n ** 3:.2e} операций")
     print(f"Производительность BLAS: {ref_mflops:.2f} MFLOPS (100%)")
-    print("Вариант 3 показывает ≥30% от BLAS.")
+    if best_rel >= 30:
+        print("Результат варианта 3: ≥30% от BLAS — требование выполнено.")
+    else:
+        print(f"Результат варианта 3: {best_rel:.1f}% от BLAS — требование НЕ выполнено.")
     print("=" * 70)
-
-
+# 7. Запуск
 if __name__ == "__main__":
     main()
-print("Мироненко Егор Сергеевич")
-print("гр: 090301-ПОВа-о25")
+    print("\nМироненко Егор Сергеевич")
+    print("гр: 090301-ПОВа-о25")
