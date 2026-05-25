@@ -118,7 +118,7 @@ def next_greater_element(arr, stack):
 
 #Тестирование на примере из задания
 def test_example():
-    print("\n--- Проверка на примере из задания ---")
+    print("\nПроверка на примере из задания")
     A = [1, 3, 2, 5, 3, 4]
     expected = [3, 5, 5, 0, 4, 0]
 
@@ -131,11 +131,11 @@ def test_example():
                              ("стек через collections.deque", DequeStack)]:
         stack = StackClass()
         result = next_greater_element(A, stack)
-        print(f"{name:18} -> {result}  {'✅' if result == expected else '❌'}")
+        print(f"{name:18} -> {result}  {'Да' if result == expected else 'Нет'}")
 
 #Сравнение производительности
 def performance_test(size=100000, runs=5):
-    print(f"\n--- Сравнение производительности (размер массива = {size}, прогонов = {runs}) ---")
+    print(f"\nСравнение производительности (размер массива = {size}, прогонов = {runs})")
     # Генерируем случайный массив
     random.seed(42)
     test_array = [random.randint(0, 10000) for _ in range(size)]
