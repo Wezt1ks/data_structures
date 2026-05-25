@@ -9,7 +9,7 @@ def print_author():
     print("Лабораторная работа №3")
     print("Тема: Стек. Замена на следующий больший элемент")
 
-# ---------- 1. Стек на массиве (динамический) ----------
+#1. Стек на массиве (динамический)
 class ArrayStack:
     def __init__(self, initial_capacity=16):
         self._data = [None] * initial_capacity
@@ -43,7 +43,7 @@ class ArrayStack:
     def is_empty(self):
         return self._size == 0
 
-# ---------- 2. Стек на связном списке ----------
+#2. Стек на связном списке
 class Node:
     def __init__(self, value):
         self.value = value
@@ -73,7 +73,7 @@ class LinkedListStack:
     def is_empty(self):
         return self._head is None
 
-# ---------- 3. Стек через стандартную библиотеку (deque) ----------
+#3. Стек через стандартную библиотеку (deque)
 class DequeStack:
     def __init__(self):
         self._deque = deque()
@@ -94,7 +94,7 @@ class DequeStack:
     def is_empty(self):
         return len(self._deque) == 0
 
-# ---------- Алгоритм замены на следующий больший элемент ----------
+#Алгоритм замены на следующий больший элемент
 def next_greater_element(arr, stack):
     """
     Возвращает новый список, где каждый элемент заменён на ближайший следующий
@@ -116,7 +116,7 @@ def next_greater_element(arr, stack):
         stack.push(arr[i])
     return result
 
-# ---------- Тестирование на примере из задания ----------
+#Тестирование на примере из задания
 def test_example():
     print("\n--- Проверка на примере из задания ---")
     A = [1, 3, 2, 5, 3, 4]
@@ -133,7 +133,7 @@ def test_example():
         result = next_greater_element(A, stack)
         print(f"{name:18} -> {result}  {'✅' if result == expected else '❌'}")
 
-# ---------- Сравнение производительности ----------
+#Сравнение производительности
 def performance_test(size=100000, runs=5):
     print(f"\n--- Сравнение производительности (размер массива = {size}, прогонов = {runs}) ---")
     # Генерируем случайный массив
