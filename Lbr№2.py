@@ -1,15 +1,16 @@
 import numpy as np
 import time
-from numba import jit
-# 1. Генерация случайных комплексных матриц
+from numba import jit, prange
+import scipy.linalg.blas as blas
+# 1. Генерация матриц
 def generate_matrices(n):
     A = (np.random.randn(n, n).astype(np.float32) +
          1j * np.random.randn(n, n).astype(np.float32))
     B = (np.random.randn(n, n).astype(np.float32) +
          1j * np.random.randn(n, n).astype(np.float32))
     return A, B
-# 2. Наивный алгоритм (вариант 1) с Numba
-@jit(nopython=True)
+# Вариант 1: Наивный алгоритм (Линейная алгебра)
+@jit(nopython=True, fastmath=True)
 def naive_matmul(A, B):
     n = A.shape[0]
     C = np.zeros((n, n), dtype=np.complex64)
@@ -19,89 +20,73 @@ def naive_matmul(A, B):
             for j in range(n):
                 C[i, j] += aik * B[k, j]
     return C
-# 3. Эталонный BLAS (вариант 2)
-def blas_matmul(A, B):
-    return A @ B
 
-# 4. Блочный алгоритм с вызовом BLAS для подблоков (вариант 3)
-def block_matmul_blas(A, B, block_size=512):
+# Вариант 2: Явный вызов cblas_cgemm из BLAS
+def blas_matmul(A, B):
+    # cgemm — это версия gemm для single precision complex (complex64)
+    return blas.cgemm(alpha=1.0, a=A, b=B)
+
+# Вариант 3: Оптимизированный блочный алгоритм, НАПИСАННЫЙ ВАМИ (через Numba)
+@jit(nopython=True, fastmath=True, parallel=True)
+def block_matmul_optimized(A, B):
+    BLOCK_SIZE = 32
     n = A.shape[0]
     C = np.zeros((n, n), dtype=np.complex64)
-    for i in range(0, n, block_size):
-        i_end = min(i + block_size, n)
-        for k in range(0, n, block_size):
-            k_end = min(k + block_size, n)
-            for j in range(0, n, block_size):
-                j_end = min(j + block_size, n)
-                C[i:i_end, j:j_end] += A[i:i_end, k:k_end] @ B[k:k_end, j:j_end]
+    num_blocks = n // BLOCK_SIZE  # Количество блоков по одной оси
+    # prange идет по сетке блоков со стандартным шагом 1, что полностью устраивает Numba
+    for bi in prange(num_blocks):
+        i0 = bi * BLOCK_SIZE
+        for bk in range(num_blocks):
+            k0 = bk * BLOCK_SIZE
+            for bj in range(num_blocks):
+                j0 = bj * BLOCK_SIZE
+                # Локальное перемножение внутри выбранных блоков
+                for i in range(i0, i0 + BLOCK_SIZE):
+                    for k in range(k0, k0 + BLOCK_SIZE):
+                        aik = A[i, k]
+                        for j in range(j0, j0 + BLOCK_SIZE):
+                            C[i, j] += aik * B[k, j]
     return C
-# 5. Измерение производительности
+
+# Измерение производительности
 def measure_performance(matmul_func, A, B, name, n, ref_mflops=None):
-    c = 2 * n ** 3
-    # Прогрев
+    c = 2 * (n ** 3)
+
     _ = matmul_func(A, B)
     time.sleep(0.1)
+
     start = time.perf_counter()
     C = matmul_func(A, B)
     end = time.perf_counter()
+
     elapsed = end - start
-    mflops = c / elapsed * 1e-6
+    mflops = (c / elapsed) * 1e-6
+
     if ref_mflops is not None:
-        rel = mflops / ref_mflops * 100
+        rel = (mflops / ref_mflops) * 100
         print(f"{name:35} | Время: {elapsed:.3f} с | MFLOPS: {mflops:.2f} | Отн. BLAS: {rel:.1f}%")
     else:
         print(f"{name:35} | Время: {elapsed:.3f} с | MFLOPS: {mflops:.2f}")
+
     return elapsed, mflops
-# 6. Основная функция
+
 def main():
     n = 1024
-    print("=" * 70)
     print(f"Умножение комплексных матриц {n}×{n}, тип complex64")
-    print("=" * 70)
-    print("Генерация случайных матриц...")
     A, B = generate_matrices(n)
-    print("Готово.\n")
-    #Вариант 2: эталонный BLAS
-    print("Измерение варианта 2 (BLAS / cblas_cgemm)...")
-    _, ref_mflops = measure_performance(blas_matmul, A, B, "2. BLAS (cgemm)", n)
+    # Вариант 2 (BLAS)
+    print("Измерение варианта 2 (cblas_cgemm)...")
+    _, ref_mflops = measure_performance(blas_matmul, A, B, "2. BLAS (cblas_cgemm)", n)
     print()
-
-    #Вариант 1: наивный
-    print("Измерение варианта 1 (наивный алгоритм, Numba)...")
-    measure_performance(naive_matmul, A, B, "1. Наивный (i-k-j)", n, ref_mflops)
+    # Вариант 1 (Наивный)
+    print("Измерение варианта 1 (наивный алгоритм)...")
+    measure_performance(naive_matmul, A, B, "1. Наивный (Линейная алгебра)", n, ref_mflops=ref_mflops)
     print()
-
-    #Вариант 3: блочный с BLAS внутри блоков
-    print("Измерение варианта 3 (блочный алгоритм с вызовом BLAS для подблоков)...")
-    best_mflops = 0
-    best_bs = None
-    best_rel = 0
-    for bs in [128, 256, 512]:
-        t, m = measure_performance(
-            lambda A, B, bs=bs: block_matmul_blas(A, B, block_size=bs),
-            A, B, f"3. Блочный (bs={bs})", n, ref_mflops
-        )
-        rel = m / ref_mflops * 100
-        if m > best_mflops:
-            best_mflops = m
-            best_bs = bs
-            best_rel = rel
-        if rel >= 30:
-            print(f"  -> Достигнуто ≥30% от BLAS с block_size={bs}\n")
-            break
-    else:
-        print(f"  Лучший результат: {best_mflops:.2f} MFLOPS ({best_rel:.1f}%) с bs={best_bs}")
-
-    #Итоговый вывод
-    print("\n" + "=" * 70)
-    print(f"Анализ: сложность c = 2·{n}³ = {2 * n ** 3:.2e} операций")
-    print(f"Производительность BLAS: {ref_mflops:.2f} MFLOPS (100%)")
-    if best_rel >= 30:
-        print("Результат варианта 3: ≥30% от BLAS — требование выполнено.")
-    else:
-        print(f"Результат варианта 3: {best_rel:.1f}% от BLAS — требование НЕ выполнено.")
-    print("=" * 70)
-# 7. Запуск
+    # Вариант 3 (Блочный ручной)
+    print("Измерение варианта 3 (Оптимизированный блочный ручной)...")
+    # Для ручного блочного алгоритма на CPU размер блока 64 обычно оптимален
+    measure_performance(block_matmul_optimized, A, B, "3. Блочный (собственный)", n,
+                        ref_mflops=ref_mflops)
 if __name__ == "__main__":
     main()
     print("\nМироненко Егор Сергеевич")
