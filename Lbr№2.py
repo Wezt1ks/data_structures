@@ -4,7 +4,7 @@ from numba import jit, prange
 import scipy.linalg.blas as blas
 
 
-# 1. Генерация матриц (тип double / float64, как в задании)
+# 1. Генерация матриц (тип double / float64)
 def generate_matrices(n):
     A = np.random.randn(n, n).astype(np.float64)
     B = np.random.randn(n, n).astype(np.float64)
@@ -26,7 +26,6 @@ def naive_matmul(A, B):
 
 # Вариант 2: Явный вызов cblas_dgemm из библиотеки BLAS
 def blas_matmul(A, B):
-    # dgemm — версия для вещественных чисел двойной точности (double)
     return blas.dgemm(alpha=1.0, a=A, b=B)
 
 
@@ -53,7 +52,7 @@ def block_matmul_optimized(A, B):
     return C
 
 
-# Измерение производительности по формулам из задания
+# Измерение производительности
 def measure_performance(matmul_func, A, B, name, n, ref_mflops=None):
     c = 2 * (n ** 3)  # Число операций согласно условию
 
