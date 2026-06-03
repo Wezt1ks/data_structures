@@ -2,7 +2,7 @@ import time
 import random
 from collections import deque
 
-def print_author():
+def print_author():#Автор
     print("Автор: Мироненко Егор Сергеевич")
     print("Группа: 090301-ПОВа-о25")
     print("Лабораторная работа №3")
