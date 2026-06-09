@@ -32,7 +32,7 @@ def blas_matmul(A, B):
 # Вариант 3: Оптимизированный блочный алгоритм
 @jit(nopython=True, fastmath=True, parallel=True)
 def block_matmul_optimized(A, B):
-    BLOCK_SIZE = 32
+    BLOCK_SIZE = 64
     n = A.shape[0]
     C = np.zeros((n, n), dtype=np.float64)
     num_blocks = n // BLOCK_SIZE
